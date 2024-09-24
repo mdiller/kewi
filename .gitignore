@@ -1,0 +1,6 @@
+resources/private
+
+__pycache__/
+kewi.egg-info/
+
+_temp/
