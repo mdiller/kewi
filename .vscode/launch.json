@@ -1,0 +1,31 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "ExampleScript",
+			"type": "python",
+			"request": "launch",
+			"program": "resources/scripts/example.py",
+			"console": "integratedTerminal"
+		},
+		{
+			"name": "Run Current File",
+			"type": "python",
+			"request": "launch",
+			"program": "${file}",
+			"console": "integratedTerminal"
+		},
+		{
+			"name": "Kewi CLI: Run CLI",
+			"type": "python",
+			"request": "launch",
+			"program": "src/cli/cli_main.py",  // Path to your cli.py
+			"args": ["run", "dota.recent"],  // Pass the "list" argument
+			"console": "integratedTerminal",
+			"justMyCode": true
+		}
+	]
+}

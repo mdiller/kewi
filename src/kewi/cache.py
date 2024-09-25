@@ -5,8 +5,13 @@ import orjson
 import os
 import typing
 import re
+import shutil
 
 from .utils import RESOURCE_PATH
+
+# TODO: should make the uuid ones go in a specific folder
+
+# TODO: since we can call kewi from multiple places, we should make this cache be robust enough to work with multiple processes working on it at once
 
 # currently set to 1 week timeout for cache files
 CACHE_FILE_TIMEOUT_MS = 1000 * 60 * 60 * 24 * 7
@@ -52,6 +57,9 @@ class CacheItem(dict):
 
 
 class Cache:
+	"""
+	A cache for storing files locally on the file system
+	"""
 	cache_data: typing.Dict[str, CacheItem]
 	def __init__(self):
 		self.cache_dir = RESOURCE_PATH("private/cache/")
@@ -85,6 +93,12 @@ class Cache:
 				removed_count += 1
 				del self.cache_data[uri]
 		self._save_to_disk()
+
+	def clear(self):
+		if os.path.exists(self.cache_dir):
+			shutil.rmtree(self.cache_dir)
+		if not os.path.exists(self.cache_dir):
+			os.makedirs(self.cache_dir)
 
 	# Returns the filename of the cached url if it exists, otherwise None
 	def get_filename(self, uri):

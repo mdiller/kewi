@@ -1,4 +1,5 @@
 resources/private
+scripts/private
 
 __pycache__/
 kewi.egg-info/
