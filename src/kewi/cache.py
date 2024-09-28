@@ -140,7 +140,7 @@ class Cache:
 		
 		dirchars_pattern = "^[:a-zA-Z0-9_-]+$"
 		if re.match(dirchars_pattern, uri):
-			parts = uri.split(":")
+			parts = uri.split(".")
 			parts = [item for item in parts if item != ".."]
 			filename = "/".join(parts)
 		else:

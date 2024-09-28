@@ -2,16 +2,13 @@
 # PYTHON_ARGCOMPLETE_OK
 import argcomplete
 import argparse
-from argcomplete.completers import ChoicesCompleter
-
 from kewi.core.runner import Runner
 import kewi
 
 runner = Runner()
 
-# TODO: update autocomplete to be smarter and support my custom arguments for my scripts. also see if we can make it support the discord autocomplete too.
-
 # Define a completer function for script names
+# TODO: this autocomplete thing should list all the dirs and scripts in this directory, not the full paths to all of the scripts we have
 def scriptname_completer(prefix, parsed_args, **kwargs):
 	scripts = runner.list_scripts()
 	names =  [script.name for script in scripts if script.name.startswith(prefix)]
@@ -20,13 +17,12 @@ def scriptname_completer(prefix, parsed_args, **kwargs):
 def list_scripts(cmd_namespace):
 	scripts = runner.list_scripts()
 	for script in scripts:
-		# TODO: print a table with name, description in future here.
 		kewi.out.print(f"{script.name}")
 
-def run_script(scriptname):
+def run_script(scriptname, cli_args):
 	script = runner.get_script(scriptname)
 	if script:
-		runner.run_script(script)
+		runner.run_script(script, cli_args)  # Pass the CLI arguments to the runner
 	else:
 		kewi.out.print(f"Couldn't find a script by that name")
 
@@ -43,7 +39,12 @@ def main():
 		"scriptname",
 		help="The name of the script to run"
 	).completer = scriptname_completer
-	run_parser.set_defaults(func=lambda args: run_script(args.scriptname))
+	run_parser.add_argument(
+		"script_args", 
+		nargs=argparse.REMAINDER,  # Accept additional arguments as script arguments
+		help="Arguments to pass to the script"
+	)
+	run_parser.set_defaults(func=lambda args: run_script(args.scriptname, args.script_args))
 
 	help_parser = subparsers.add_parser("help", help="Show help information")
 	help_parser.set_defaults(func=lambda args: parser.print_help())

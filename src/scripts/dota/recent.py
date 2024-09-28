@@ -4,11 +4,15 @@ from dotabase import dotabase_session, Hero
 
 from kewi.out import TableAlign
 
-# TODO: make this an input argument
-player_id = 95211699
+ARG_player_id = kewi.globals.Dota.STEAM_ID
+kewi.args.init()
 
-url = f"https://api.opendota.com/api/players/{player_id}/matches?limit=20"
+url = f"https://api.opendota.com/api/players/{ARG_player_id}/matches?limit=20"
 
+# TODO: replace this with some custom http getter that posts status updates and shit to console
+# - we should have this custom http getter like update a line in console with the status and the status code when it finishes
+# - should have like a white background or something would be nice
+# - can do some reaaaaally nice advanced pretty logging like this. can also use it for cache retrieval stuff
 response = requests.get(url)
 
 

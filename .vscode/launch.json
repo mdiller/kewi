@@ -23,7 +23,16 @@
 			"type": "python",
 			"request": "launch",
 			"program": "src/cli/cli_main.py",  // Path to your cli.py
-			"args": ["run", "dota.recent"],  // Pass the "list" argument
+			"args": ["run", "test.args"],  // Pass the "list" argument
+			"console": "integratedTerminal",
+			"justMyCode": true
+		},
+		{
+			"name": "TEST THING",
+			"type": "python",
+			"request": "launch",
+			"program": "_temp/runner/my_script.py",  // Path to your cli.py
+			"args": ["Alice", "RED", "5"],  // Pass the "list" argument
 			"console": "integratedTerminal",
 			"justMyCode": true
 		}

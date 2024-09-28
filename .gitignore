@@ -5,3 +5,9 @@ __pycache__/
 kewi.egg-info/
 
 _temp/
+
+_*.mp3
+
+
+globals.json
+_generated_globals.py

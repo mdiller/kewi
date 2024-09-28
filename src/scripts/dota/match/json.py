@@ -3,20 +3,12 @@ import requests
 import json
 import os
 
-# THIS IS HOW WE'RE GONNA MAKE THE match_id THING BELOW BE AN INPUT FROM THE USER
-# OK SO WE DEFINETLY WANNA IMPLEMNET IT LIKE THIS, BUT WE ARENT SURE ON THE NAMING
-# this will inherit from a class in kewi
-class KewiScript():
-	match_id: int
-# scriptstuff = KewiScript.load()
+ARG_match_id: int = kewi.globals.Dota.EXAMPLE_MATCH_ID
+kewi.args.init()
 
+url = f"https://api.opendota.com/api/matches/{ARG_match_id}"
 
-# TODO: make this an input argument
-match_id = 7957318100
-
-url = f"https://api.opendota.com/api/matches/{match_id}"
-
-uri = f"dota:matches:match_{match_id}"
+uri = f"dota.matches.match_{ARG_match_id}"
 
 filename = kewi.cache.get_filename(uri)
 

@@ -1,0 +1,192 @@
+import os
+import re
+import datetime
+import yaml
+import random
+import string
+import shutil
+from .globals._generated_globals import Globals
+
+# Set this before running any obsidian stuff
+ROOT_DIR = Globals.Obsidian.VAULT_ROOT
+OBS_ATTACHMENTS_DIR = os.path.join(ROOT_DIR, Globals.Obsidian.ATTACHMENTS_DIR)
+
+def file(path):
+	return ObsidianFile(path)
+
+def fix_path(path, print_if_missing=True):
+	if path is None:
+		raise Exception("null path passed to fix_path")
+	link_pattern = re.compile("^\[\[([^|]*)|.*\]\]$")
+	match = link_pattern.search(path)
+	if match:
+		path = match.group(1)
+	if ROOT_DIR and (not ROOT_DIR in path) or not os.path.exists(path):
+		path = os.path.join(ROOT_DIR, path)
+	if not os.path.exists(path):
+		if print_if_missing:
+			print(f"ERROR OBS FILE NOT FOUND: {path}")
+		return None
+	return path
+
+# attaches the file and returns a link to the attached file
+def attach_file(src_filepath):
+	filename = os.path.basename(src_filepath)
+
+	new_filepath = os.path.join(OBS_ATTACHMENTS_DIR, filename)
+
+	filepath_no_ext, ext = os.path.splitext(new_filepath)
+	while os.path.exists(new_filepath):
+		random_string = ''.join(random.choice(string.ascii_uppercase) for _ in range(8))
+		new_filepath = filepath_no_ext + f"_{random_string}" + ext
+
+	shutil.copy(src_filepath, new_filepath)
+	return os.path.basename(new_filepath)
+
+# <div class="rock-assistant-out"><span>Rock Assistant</span><span>0.0202¢ | 111 tokens | 5:31pm Dec 12, 2023</span></div>
+ASS_OUTPUT_PATTERN = re.compile("\n<div class=\"rock-assistant-out\"><span>Rock Assistant</span><span>(?:([^\n]+) \| |)([^\n]+)</span></div>\n\n([\s\S]*)$", re.MULTILINE | re.DOTALL)
+# a representation of the assistant output
+class AssOutput():
+	timestamp: str
+	text: str
+	extra_info: str
+	def __init__(self, text, extra_info = None, timestamp = None):
+		self.text = text
+		self.extra_info = extra_info
+		self.timestamp = timestamp
+	
+	def __repr__(self):
+		info_stuff = "";
+		if self.extra_info:
+			info_stuff += f" {self.extra_info} | "
+		result = f"\n<div class=\"rock-assistant-out\"><span>Rock Assistant</span><span>{info_stuff}{self.timestamp}</span></div>\n\n{self.text}"
+		return result
+	
+	@classmethod
+	def parse(cls, match):
+		return AssOutput(match.group(3), match.group(2), match.group(1))
+
+class ObsidianFile():
+	name: str
+	path: str
+	metadata_text: str
+	metadata: dict
+	ass_output: AssOutput
+	content: str
+
+	def __init__(self, path):
+		path = fix_path(path)
+		self.content = None
+		self.metadata_text = None
+		self.metadata = None
+		self.ass_output = None
+		self.path = path
+		self.name = os.path.splitext(os.path.basename(path))[0]
+		self.read()
+	
+	
+	def read(self):
+		with open(self.path, "r", encoding="utf8") as f:
+			text = f.read()
+
+		metadata_regex = re.compile("^---\n([\s\S]*?)\n---\n", re.MULTILINE | re.DOTALL)
+		match = metadata_regex.search(text)
+		if match:
+			self.metadata_text = match.group(1)
+			try:
+				self.metadata = yaml.safe_load(self.metadata_text) # to write: yaml.safe_dump(a, sort_keys=False)
+			except Exception:
+				print(f"ERROR reading metadata of: {self.path}")
+				self.metadata = {}
+			text = re.sub(metadata_regex, "", text)
+		else:
+			self.metadata = None
+		
+		match = ASS_OUTPUT_PATTERN.search(text)
+		if match:
+			self.ass_output = AssOutput.parse(match)
+			text = re.sub(ASS_OUTPUT_PATTERN, "", text)
+		
+		self.content = text
+	
+	def reload(self):
+		self.read()
+	
+	def _get_full_content(self):
+		text = ""
+		if self.metadata_text is not None:
+			text += f"---\n{self.metadata_text}\n---\n"
+		text += self.content
+
+		if self.ass_output is not None:
+			if isinstance(self.ass_output, str):
+				self.ass_output = AssOutput(self.ass_output)
+			if len(self.content) > 0 and self.content[-1] != "\n":
+				text += "\n"
+			
+			if self.ass_output.timestamp is None:
+				timestamp = datetime.datetime.now().strftime("%I:%M%p %b %d, %Y")
+				if timestamp.startswith("0"):
+					timestamp = timestamp[1:]
+				timestamp = re.sub("(AM|PM)", lambda m: m.group(1).lower(), timestamp)
+				self.ass_output.timestamp = timestamp
+
+			text += str(self.ass_output)
+		return text
+	
+	def generate_metadata(self):
+		self.metadata_text = yaml.safe_dump(self.metadata, sort_keys=False).strip()
+
+	def write(self):
+		text = self._get_full_content()
+		with open(self.path, "w+", encoding="utf8") as f:
+			f.write(text)
+
+	def add_note(self, text):		
+		current_time = datetime.datetime.now()
+		timestamp_lifespan = 3
+
+		# determine if we should include date
+		include_day = self.metadata is None or self.metadata.get("date") is None
+
+		recent_timestamps = []
+		for i in range(timestamp_lifespan + 1):
+			the_datetime = current_time - datetime.timedelta(minutes=i)
+			time = the_datetime.strftime("%I:%M %p")
+			if time.startswith("0"):
+				time = " " + time[1:]
+			if include_day:
+				time += the_datetime.strftime(" (%d-%b-%Y)")
+			recent_timestamps.append(f"\n<span class=\"dillerm-timestamp\">{time}</span>\n")
+		
+		found_recent_timestamp = False
+		for timestamp in recent_timestamps:
+			if timestamp in self.content:
+				found_recent_timestamp = True
+		
+		if found_recent_timestamp:
+			self.content += f"{text}\n"
+		else:
+			if not re.search("\n\s*\n$", self.content):
+				self.content += "\n"
+			self.content += f"{recent_timestamps[0]}{text}\n"
+		self.write()
+
+	# adds todo to the first list of todos in the note
+	def add_todo_item(self, item):
+		pattern = r"(?<=\n)([\t ]*- \[(x|\s)\]([ ]+)([^\n]*)\n)(?![\t ]*- \[)"
+		match = re.search(pattern, self.content)
+		if not match:
+			raise Exception("Couldn't find a todo in this file")
+		# item = re.escape(item)
+		item = f"- [ ] {item}\n"
+		if len(match.group(4)) > 2:
+			item = f"\\1{item}"
+		self.content = re.sub(pattern, item, self.content, 1)
+		self.write()
+	
+	def print(self, text):
+		self.content += f"\n{text}"
+		self.write()
+
+
