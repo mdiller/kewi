@@ -11,3 +11,5 @@ _*.mp3
 
 globals.json
 _generated_globals.py
+_*.md
+_*.sql
