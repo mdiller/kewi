@@ -6,5 +6,34 @@
     "Obsidian": {
         "VAULT_ROOT": "",
         "ATTACHMENTS_DIR": ""
+    },
+    "Dillerbase": {
+        "CONNECTION_STRING": ""
+    },
+    "TIMEZONE": "",
+    "ComfyUI": {
+        "ROOT_DIR": "",
+        "MODELS_DIR": ""
+    },
+    "Reddit": {
+        "CLIENT_ID": "",
+        "CLIENT_SECRENT": "",
+        "USER_AGENT": ""
+    },
+    "Moments": {
+        "ROOT_DIR": "",
+        "EXAMPLE_FILE": ""
+    },
+    "Discord": {
+        "MY_ID": 0,
+        "TEST_GUILD": 0,
+        "Bot": {
+            "CLIENT_ID": 0,
+            "TOKEN": "",
+            "PERMISSIONS_INT": 0
+        }
+    },
+    "Assistant": {
+        "PORT": 0
     }
 }

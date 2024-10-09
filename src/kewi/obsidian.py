@@ -164,11 +164,12 @@ class ObsidianFile():
 			if timestamp in self.content:
 				found_recent_timestamp = True
 		
+		if not re.search("\n$", self.content):
+			self.content += "\n" # if doesnt end in a newline, add a newline
+
 		if found_recent_timestamp:
 			self.content += f"{text}\n"
 		else:
-			if not re.search("\n\s*\n$", self.content):
-				self.content += "\n"
 			self.content += f"{recent_timestamps[0]}{text}\n"
 		self.write()
 

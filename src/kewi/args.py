@@ -3,7 +3,13 @@ import inspect
 from enum import Enum
 from typing import Any, List
 from abc import ABC, abstractmethod
+from datetime import datetime, timedelta
 import os
+from .globals._generated_globals import Globals
+import pytz
+import re
+
+globals = Globals()
 
 # Global variable to hold the current runner instance
 _current_runner = None
@@ -11,7 +17,7 @@ _current_runner = None
 class KewiInputError(Exception):
 	"""Custom exception to handle input validation errors."""
 	
-	def __init__(self, arg_name: str, value: str, expected_type: Any, error_message: str = None):
+	def __init__(self, arg_name: str, expected_type: Any, value: str, error_message: str = None):
 		self.arg_name = arg_name
 		self.value = value
 		self.expected_type = expected_type
@@ -76,6 +82,7 @@ def init(runner: RunnerBase = None):
 		if runner is None:
 			runner = get_current_runner()
 		
+		# TODO: fix this so i dont have to necessarily assign a type to my variable
 		# Retrieve all annotated variables (ARG_*) from the global namespace
 		arg_annotations = {k: v for k, v in frame.f_globals.get('__annotations__', {}).items() if k.startswith("ARG_")}
 		
@@ -84,7 +91,12 @@ def init(runner: RunnerBase = None):
 		for position, (arg_name, arg_type) in enumerate(arg_annotations.items()):
 			full_name = arg_name
 			name = arg_name[4:]  # Remove the "ARG_" prefix
-			default = frame.f_globals.get(arg_name, inspect.Parameter.empty)
+			default = frame.f_globals.get(arg_name, None)
+
+			if default is not None and not isinstance(default, arg_type) and hasattr(arg_type, "parse"):
+				default = arg_type.parse(name + "(DEFAULT_VALUE)", arg_type, default)
+				frame.f_globals[full_name] = default
+
 			kewi_arg = KewiArg(name, full_name, arg_type, position, default)
 			kewi_args.append(kewi_arg)
 		
@@ -143,7 +155,7 @@ def request_input(arg_name: str, arg_type: Any) -> Any:
 			user_input = input(f"Please enter a value for {arg_name} (type {arg_type.__name__}): ")
 			return parse_input_value(arg_name, arg_type, user_input)
 	except ValueError as ve:
-		raise KewiInputError(arg_name, user_input, arg_type) from ve
+		raise KewiInputError(arg_name, arg_type, user_input) from ve
 
 
 def parse_input_value(arg_name: str, arg_type: Any, value: str) -> Any:
@@ -160,9 +172,9 @@ def parse_input_value(arg_name: str, arg_type: Any, value: str) -> Any:
 		elif hasattr(arg_type, "parse"):
 			return arg_type.parse(arg_name, arg_type, value)
 		else:
-			raise KewiInputError(arg_name, value, arg_type)
+			raise KewiInputError(arg_name, arg_type, value)
 	except ValueError as ve:
-		raise KewiInputError(arg_name, value, arg_type) from ve
+		raise KewiInputError(arg_name, arg_type, value) from ve
 
 
 def parse_enum_input(arg_name: str, enum_type: Enum, value: str) -> Enum:
@@ -173,7 +185,7 @@ def parse_enum_input(arg_name: str, enum_type: Enum, value: str) -> Enum:
 			return list(enum_type)[value - 1]
 		return enum_type[value.upper()]
 	except (IndexError, KeyError):
-		raise KewiInputError(arg_name, value, enum_type)
+		raise KewiInputError(arg_name, enum_type, value)
 
 
 def parse_bool_input(arg_name: str, value: str) -> bool:
@@ -185,7 +197,7 @@ def parse_bool_input(arg_name: str, value: str) -> bool:
 	elif value.lower() in false_values:
 		return False
 	else:
-		raise KewiInputError(arg_name, value, bool)
+		raise KewiInputError(arg_name, bool, value)
 
 # TODO: maybe add a separate version of this that doesnt verify that the file exists when parsing??
 class FilePath():
@@ -195,10 +207,11 @@ class FilePath():
 	@classmethod
 	def parse(cls, arg_name: str, arg_type: Any, value: str):
 		# TODO: add support for aliases here to get stuff like "the last cache file saved" etc.
-		result = FilePath(value)
-		if not result.exists():
+		if not os.path.exists(value):
+			value = os.path.join(globals.Obsidian.VAULT_ROOT, value)
+		if not os.path.exists(value):
 			raise KewiInputError(arg_name, arg_type, value, f"'{value}' is not an existing file")
-		return result
+		return FilePath(value)
 	
 	def __str__(self):
 		return self.fullpath
@@ -208,4 +221,92 @@ class FilePath():
 
 	def ext(self):
 		return os.path.splitext(self.fullpath)[1]
+
+
+PAST_MIDNIGHT_HOURS = 5 # how many hours past midnight is still considered the same day
+LOCAL_TZ = pytz.timezone(globals.TIMEZONE)
+class TimeSpan:
+	def __init__(self, start: datetime, end: datetime):
+		self.start = start
+		self.end = end
+
+	def __str__(self):
+		result = "start: " + self.start.strftime("%I:%M %p - %d-%b-%Y")
+		result += "\n  end: " + self.end.strftime("%I:%M %p - %d-%b-%Y")
+		return result
+
+	@classmethod
+	def from_day(cls, text: str):
+		day: datetime
+		if isinstance(text, datetime):
+			if text.tzinfo is not None and text.tzinfo.utcoffset(text) is not None:
+				day = text.astimezone(LOCAL_TZ)
+			else:
+				day = LOCAL_TZ.localize(text)
+			day -= timedelta(hours=PAST_MIDNIGHT_HOURS)
+			day = day.replace(hour=0, minute=0, second=0)
+		else:
+			day = datetime.strptime(text, "%Y-%m-%d")
+			day = LOCAL_TZ.localize(day)
+		day = day.replace(hour=PAST_MIDNIGHT_HOURS, minute=0, second=0)
+		end = day + timedelta(hours=24)
+		return TimeSpan(day, end)
+
+	@classmethod
+	def last_x_hours(cls, hours: int):
+		now = datetime.now(LOCAL_TZ)
+		then = now - timedelta(hours=hours)
+		return TimeSpan(then, now)
+		
+	@classmethod
+	def parse(cls, arg_name: str, arg_type: Any, value: str):
+		time_kinds = {
+			"minute": 1,
+			"hour": 60,
+			"day": 60 * 24,
+			"week": 60 * 24 * 7
+		}
+		time_kinds_pattern =  "|".join(map(lambda k: k + "s?", time_kinds.keys()))
+		pattern = f"last (\d+) ({time_kinds_pattern})"
+		match = re.match(pattern, value)
+		if match:
+			number = int(match.group(1))
+			time_kind = match.group(2)
+			time_kind = time_kind.replace("s", "")
+
+			now = datetime.now(LOCAL_TZ)
+			kind_modifier = time_kinds[time_kind]
+			then = now - timedelta(minutes=(number * kind_modifier))
+			return TimeSpan(then, now)
+
+		if value == "today":
+			return TimeSpan.from_day(datetime.now(LOCAL_TZ))
+		if value == "yesterday":
+			day = datetime.now(LOCAL_TZ)
+			day -= timedelta(days=1)
+			return TimeSpan.from_day(day)
+
+		pattern = f"(\d+) days? ago"
+		match = re.match(pattern, value)
+		if match:
+			number = int(match.group(1))
+			day = datetime.now(LOCAL_TZ)
+			day -= timedelta(days=number)
+			return TimeSpan.from_day(day)
+
+		weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+		if value in map(lambda d: "last " + d, weekdays):
+			value = value.replace("last ", "")
+		if value in weekdays:
+			day = datetime.now(LOCAL_TZ)
+			current_weekday = day.weekday()
+			target_weekday = weekdays.index(value)
+			days_ago = (current_weekday - target_weekday) % 7 or 7
+			day -= timedelta(days=days_ago)
+			return TimeSpan.from_day(day)
+
+		try:
+			return TimeSpan.from_day(value)
+		except ValueError as e:
+			raise KewiInputError(arg_name, arg_type, value)
 

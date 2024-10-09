@@ -4,9 +4,10 @@ import pytz
 import kewi
 
 # Replace with your actual database connection string
-ARG_hours_ago : int = 4
+ARG_time_span : kewi.args.TimeSpan = "last 4 hours"
 kewi.args.init()
 
+print(ARG_time_span)
 
 # Connect to the PostgreSQL database
 try:
@@ -15,9 +16,6 @@ try:
 
     # Get the local timezone
     local_tz = pytz.timezone(kewi.globals.TIMEZONE)  # like 'America/Los_Angeles'
-    
-    # Calculate the timestamp for the cutoff time
-    cutoff_time = datetime.now(local_tz) - timedelta(hours=ARG_hours_ago)
 
     # SQL query to fetch recent song_listens events
     query = """
@@ -25,15 +23,18 @@ try:
         FROM song_listens sl
         JOIN songs s ON sl.song_id = s.id
         WHERE sl.timestamp >= %s
+        AND sl.timestamp <= %s
         ORDER BY sl.timestamp DESC;
     """
-    cursor.execute(query, (cutoff_time,))
+    cursor.execute(query, (ARG_time_span.start, ARG_time_span.end,))
     results = cursor.fetchall()
 
 
     lines = []
     # Print the results in the desired format
     for timestamp, song_name, duration_ms in results:
+        timestamp: datetime
+        
         iso_timestamp = timestamp.isoformat()
         local_time = timestamp.replace(tzinfo=pytz.utc).astimezone(local_tz)
         formatted_date = local_time.strftime("%b %d")

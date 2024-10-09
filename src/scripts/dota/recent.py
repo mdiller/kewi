@@ -1,13 +1,14 @@
 import kewi
 import requests
 from dotabase import dotabase_session, Hero
+from datetime import datetime
 
 from kewi.out import TableAlign
 
-ARG_player_id = kewi.globals.Dota.STEAM_ID
+ARG_player_id: int = kewi.globals.Dota.STEAM_ID
 kewi.args.init()
 
-url = f"https://api.opendota.com/api/players/{ARG_player_id}/matches?limit=20"
+url = f"https://api.opendota.com/api/players/{ARG_player_id}/matches?limit=20&significant=0"
 
 # TODO: replace this with some custom http getter that posts status updates and shit to console
 # - we should have this custom http getter like update a line in console with the status and the status code when it finishes
@@ -34,10 +35,13 @@ header = [
 	"ID",
 	"Hero",
 	"",
-	"KDA"
+	"KDA",
+	"Start Time"
 ]
 
 kewi.out.print("Matches:")
+
+# TODO: have a like kewi.openscratch or soemthing that saves the json and opens it in a cache json file for viewing
 
 table = []
 for match in data:
@@ -47,11 +51,16 @@ for match in data:
 		str(match["deaths"]),
 		str(match["assists"])
 	])
+	
+	date = datetime.fromtimestamp(match["start_time"])
+	# TODO: add a library thing to do the below date formatting in a more reliable and good way (proper spacing, remove leading zeroes)
+
 	table.append([
 		match["match_id"],
 		"Win" if did_win else "Loss",
 		hero_lookup(match["hero_id"]),
-		kda
+		kda,
+		date.strftime("%I:%M%p, %b %d %Y")
 	])
 
 kewi.out.print_table(table, align=TableAlign.LEFT)

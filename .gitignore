@@ -1,12 +1,14 @@
 resources/private
-scripts/private
+src/scripts/private
 
 __pycache__/
 kewi.egg-info/
 
 _temp/
+_local/
 
 _*.mp3
+_*.json
 
 
 globals.json

@@ -6,6 +6,7 @@ import os
 import typing
 import re
 import shutil
+import json
 
 from .utils import RESOURCE_PATH
 
@@ -54,6 +55,35 @@ class CacheItem(dict):
 	
 	def is_expired(self, timestamp_threshold):
 		return (not self.permanent) and (self.timestamp < timestamp_threshold)
+
+# A cached json file that can be easily saved
+class CachedJson:
+	def __init__(self, filepath): # only to be used internally
+		self.filepath = filepath
+		self.data = {}
+		self.read()
+	
+	def read(self):
+		if os.path.exists(self.filepath):
+			with open(self.filepath, "r", encoding="utf-8") as f:
+				self.data = json.loads(f.read())
+	
+	def save(self):
+		text = json.dumps(self.data, indent="\t")
+		with open(self.filepath, "w+", encoding="utf-8") as f:
+			f.write(text)
+		
+	# Allow access using []
+	def __getitem__(self, key):
+		return self.data[key]
+	
+	# Allow setting values using []
+	def __setitem__(self, key, value):
+		self.data[key] = value
+	
+	# Allow deletion using del []
+	def __delitem__(self, key):
+		del self.data[key]
 
 
 class Cache:
@@ -138,7 +168,7 @@ class Cache:
 			if os.path.isfile(filename):
 				return filename
 		
-		dirchars_pattern = "^[:a-zA-Z0-9_-]+$"
+		dirchars_pattern = "^[a-zA-Z0-9_.-]+$"
 		if re.match(dirchars_pattern, uri):
 			parts = uri.split(".")
 			parts = [item for item in parts if item != ".."]
@@ -157,6 +187,10 @@ class Cache:
 		self.cache_data[uri] = CacheItem.create(filename, permanent=permanent)
 		self._save_to_disk()
 		return full_path
+	
+	def load_json(self, uri):
+		filename = self.new(uri, "json")
+		return CachedJson(filename)
 
 
 	def remove(self, uri):
@@ -166,3 +200,5 @@ class Cache:
 			if os.path.isfile(filename):
 				os.remove(filename)
 			del self.cache_data[uri]
+
+
