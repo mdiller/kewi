@@ -5,9 +5,9 @@ import kewi
 
 # give this a path to a steelseries moments video file
 ARG_video_file: kewi.args.FilePath = kewi.globals.Moments.EXAMPLE_FILE
-kewi.args.init()
+kewi.ctx.init()
 
-kewi.out.print("Target File: " + ARG_video_file.fullpath)
+kewi.ctx.print("Target File: " + ARG_video_file.fullpath)
 
 json_filename = kewi.cache.new(ARG_video_file.fullpath, "json")
 
@@ -42,9 +42,9 @@ before_text = json.dumps(data, indent="\t")
 with open(json_filename, "w+") as f:
 	f.write(before_text)
 
-kewi.out.print("Wrote json to: " + json_filename)
+kewi.ctx.print("Wrote json to: " + json_filename)
 os.startfile(json_filename)
-kewi.out.print("Now edit this file, and then press enter in console to save the changes to the video file")
+kewi.ctx.print("Now edit this file, and then press enter in console to save the changes to the video file")
 
 input("Press Enter:")
 
@@ -53,14 +53,14 @@ with open(json_filename, "r") as f:
 	after_text = f.read()
 
 if before_text == after_text:
-	kewi.out.print("JSON unchanged. Exiting.")
+	kewi.ctx.print("JSON unchanged. Exiting.")
 	exit(0)
 
 data = None
 try:
 	data = json.loads(after_text)
 except:
-	kewi.out.print("ERROR loading new json. Exiting.")
+	kewi.ctx.print("ERROR loading new json. Exiting.")
 	exit(0)
 
 def write_video_json(video_path, json_data):
@@ -87,5 +87,5 @@ def write_video_json(video_path, json_data):
 	video.save()
 
 write_video_json(ARG_video_file.fullpath, data)
-kewi.out.print("Saved!")
+kewi.ctx.print("Saved!")
 

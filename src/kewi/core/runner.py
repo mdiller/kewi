@@ -1,7 +1,7 @@
 import os
 import typing
 import kewi.args  # Import kewi.args to handle argument initialization
-from kewi.args import RunnerBase, set_current_runner
+from kewi.context import KewiContext, KewiContextConsole
 from ..utils import REPO_PATH
 
 class ScriptInfo():
@@ -18,7 +18,7 @@ class ScriptInfo():
 		self.name = name
 
 
-class Runner(RunnerBase):
+class Runner():
 	"""
 	For the listing and running of scripts.
 	"""
@@ -29,6 +29,7 @@ class Runner(RunnerBase):
 		self.script_dirs = [REPO_PATH("src/scripts")]
 		self.script_infos = []
 		self.cli_args = None
+		self.last_args_seen: typing.List[kewi.args.KewiArg] = None
 		self.load_scripts()
 
 	def load_scripts(self):
@@ -45,6 +46,8 @@ class Runner(RunnerBase):
 
 	def get_script(self, scriptname: str) -> ScriptInfo:
 		"""Get a ScriptInfo object by its name."""
+		if scriptname is None:
+			return None
 		for info in self.script_infos:
 			if info.name.lower() == scriptname.lower():
 				return info
@@ -54,46 +57,43 @@ class Runner(RunnerBase):
 		"""List all available scripts."""
 		return self.script_infos
 
-	def run_script(self, script_info: ScriptInfo, cli_args: typing.List[str]):
+	def run_script(self, script_info: ScriptInfo, ctx: KewiContext, only_run_args = False):
 		"""Run a script by its name."""
 		if script_info is None:
 			return None
 
-		# Store the CLI arguments passed to this script
-		self.cli_args = cli_args
-
-		# Set this runner as the current global runner
-		set_current_runner(self)
-
-		globals_dict = {
-			"__name__": "__main__",
-			"__file__": script_info.fullpath,
-		}
+		globals_dict = ctx.to_exec_globals()
+		globals_dict["__name__"] = "__main__"
+		globals_dict["__file__"] = script_info.fullpath
 
 		with open(script_info.fullpath) as f:
 			script_content = f.read()
+		
+		if only_run_args:
+			lines = script_content.splitlines()
+			newlines = []
+			found = False
+			for i, line in enumerate(lines):
+				newlines.append(line)
+				if "kewi.ctx.init()" in line:
+					# Return lines up to and including the line with the keyword
+					found = True
+					break
+			if not found:
+				return None
+			script_content = "\n".join(newlines)
 
 		try:
 			# Execute the script normally, and init will use the global runner
 			exec(script_content, globals_dict)
 		except kewi.args.KewiInputError as e:
-			self.handle_input_error(e)
+			if not only_run_args:
+				ctx.handle_input_error(e)
+			else:
+				raise
+	
+	def query_script_args(self, script_info: ScriptInfo) -> typing.List[kewi.args.KewiArg]:
+		ctx = KewiContextConsole.new_from_console() # TODO: replace this with some other empty stub call
+		self.run_script(script_info, ctx, only_run_args=True)
+		return ctx.kewi_args
 
-		self.cli_args = None
-
-	def get_argument_values(self, kewi_args: typing.List[kewi.args.KewiArg]) -> typing.List[str]:
-		"""
-		Fetch argument values based on the kewi_args and CLI arguments passed.
-		"""
-		if self.cli_args is not None:
-			# Use the provided CLI argument if available
-			return self.cli_args
-
-		return []
-
-	def handle_input_error(self, error: kewi.args.KewiInputError):
-		"""
-		Handle an input error detected in the script.
-		"""
-		# You can customize this to log or report the error differently
-		print(f"Runner handling input error: {error}")

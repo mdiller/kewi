@@ -23,7 +23,7 @@
 			"type": "python",
 			"request": "launch",
 			"program": "src/cli/cli_main.py",  // Path to your cli.py
-			"args": ["run", "test.args"],  // Pass the "list" argument
+			"args": ["run", "scriptname", "arg1"],  // Pass the "list" argument
 			"console": "integratedTerminal",
 			"justMyCode": true
 		},

@@ -63,6 +63,9 @@ class CachedJson:
 		self.data = {}
 		self.read()
 	
+	def exists(self):
+		return os.path.exists(self.filepath)
+
 	def read(self):
 		if os.path.exists(self.filepath):
 			with open(self.filepath, "r", encoding="utf-8") as f:
@@ -72,6 +75,10 @@ class CachedJson:
 		text = json.dumps(self.data, indent="\t")
 		with open(self.filepath, "w+", encoding="utf-8") as f:
 			f.write(text)
+	
+	def save_and_show(self):
+		self.save()
+		os.startfile(self.filepath)
 		
 	# Allow access using []
 	def __getitem__(self, key):
@@ -148,7 +155,7 @@ class Cache:
 			return None
 		if return_type == "json":
 			with open(filename, "r") as f:
-				return orjson.loads(filename)
+				return json.loads(f.read())
 		elif return_type == "text":
 			with open(filename, "r") as f:
 				return f.read()
@@ -187,8 +194,11 @@ class Cache:
 		self.cache_data[uri] = CacheItem.create(filename, permanent=permanent)
 		self._save_to_disk()
 		return full_path
+
+	def temp(self, extension=None):
+		return self.new(f"temp.tempfile_{extension}", extension)
 	
-	def load_json(self, uri):
+	def load_json(self, uri) -> CachedJson:
 		filename = self.new(uri, "json")
 		return CachedJson(filename)
 

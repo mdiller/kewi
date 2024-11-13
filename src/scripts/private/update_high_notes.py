@@ -10,7 +10,7 @@ import colorama
 colorama.init()
 
 ARG_target_dir = "C:\\home\\Notes\\general\\high\\notes"
-kewi.args.init()
+kewi.ctx.init()
 
 # TODO: maybe make a more generic / copiable version of this script so i can do these batch-updates more easily
 

@@ -9,7 +9,7 @@ class Color(Enum):
 ARG_name: str
 ARG_thing: Color
 ARG_number: int = 0
-kewi.args.init()
+kewi.ctx.init()
 
 print(f"Name: {ARG_name}")
 print(f"Thing: {ARG_thing}")

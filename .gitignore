@@ -15,3 +15,8 @@ globals.json
 _generated_globals.py
 _*.md
 _*.sql
+
+
+src/scripts
+
+src/kewi/discord/custom_cog.py

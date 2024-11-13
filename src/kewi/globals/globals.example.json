@@ -13,7 +13,13 @@
     "TIMEZONE": "",
     "ComfyUI": {
         "ROOT_DIR": "",
-        "MODELS_DIR": ""
+        "MODELS_DIR": "",
+        "SERVER_URL": "",
+        "SERVER_OUT_DIR": ""
+    },
+    "Eagle": {
+        "API_URL_BASE": "",
+        "ROOT_DIR": ""
     },
     "Reddit": {
         "CLIENT_ID": "",
@@ -35,5 +41,8 @@
     },
     "Assistant": {
         "PORT": 0
+    },
+    "OpenAI": {
+        "KEY": ""
     }
 }

@@ -5,7 +5,7 @@ import kewi
 
 # Replace with your actual database connection string
 ARG_time_span : kewi.args.TimeSpan = "last 4 hours"
-kewi.args.init()
+kewi.ctx.init()
 
 print(ARG_time_span)
 

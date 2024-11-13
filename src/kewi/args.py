@@ -1,7 +1,8 @@
 import sys
 import inspect
 from enum import Enum
-from typing import Any, List
+from types import FrameType
+from typing import Any, Callable, List
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 import os
@@ -38,6 +39,15 @@ class KewiArg:
 		self.position = position  # The zero-based position of the argument in the list
 		self.default = default  # The default value, if specified
 	
+	def to_json(self):
+		return {
+			"name": str(self.name),
+			"full_name": str(self.full_name),
+			"type": str(self.type.__name__),
+			"position": str(self.position),
+			"default": str(self.default)
+		}
+	
 	@property
 	def is_optional(self):
 		"""Return True if the argument has a default value (is optional)."""
@@ -72,57 +82,38 @@ def get_current_runner() -> RunnerBase:
 	global _current_runner
 	return _current_runner
 
+# gets the args in the given frame for the script
+def args_from_frame(frame: FrameType) -> List[KewiArg]:	
+	# TODO: fix this so i dont have to necessarily assign a type to my variable
+	# Retrieve all annotated variables (ARG_*) from the global namespace
+	arg_annotations = {k: v for k, v in frame.f_globals.get('__annotations__', {}).items() if k.startswith("ARG_")}
+	
+	# Create a list of KewiArg objects for each argument
+	kewi_args = []
+	for position, (arg_name, arg_type) in enumerate(arg_annotations.items()):
+		full_name = arg_name
+		name = arg_name[4:]  # Remove the "ARG_" prefix
+		default = frame.f_globals.get(arg_name, None)
 
-def init(runner: RunnerBase = None):
-	"""Initialize the arguments by parsing from command line or user input."""
-	try:
-		frame = inspect.currentframe().f_back
-		
-		# Retrieve the current runner if none is passed
-		if runner is None:
-			runner = get_current_runner()
-		
-		# TODO: fix this so i dont have to necessarily assign a type to my variable
-		# Retrieve all annotated variables (ARG_*) from the global namespace
-		arg_annotations = {k: v for k, v in frame.f_globals.get('__annotations__', {}).items() if k.startswith("ARG_")}
-		
-		# Create a list of KewiArg objects for each argument
-		kewi_args = []
-		for position, (arg_name, arg_type) in enumerate(arg_annotations.items()):
-			full_name = arg_name
-			name = arg_name[4:]  # Remove the "ARG_" prefix
-			default = frame.f_globals.get(arg_name, None)
+		if default is not None and not isinstance(default, arg_type) and hasattr(arg_type, "parse"):
+			default = arg_type.parse(name + "(DEFAULT_VALUE)", arg_type, default)
+			frame.f_globals[full_name] = default
 
-			if default is not None and not isinstance(default, arg_type) and hasattr(arg_type, "parse"):
-				default = arg_type.parse(name + "(DEFAULT_VALUE)", arg_type, default)
-				frame.f_globals[full_name] = default
+		kewi_arg = KewiArg(name, full_name, arg_type, position, default)
+		kewi_args.append(kewi_arg)
+	return kewi_args
 
-			kewi_arg = KewiArg(name, full_name, arg_type, position, default)
-			kewi_args.append(kewi_arg)
-		
-		# If a runner is provided, delegate argument fetching to the runner
-		if runner:
-			inputs = runner.get_argument_values(kewi_args)
-		else:
-			# Map command-line arguments (positional) to the KewiArg variables
-			inputs = parse_command_line_args(kewi_args)
-		
-		# Assign values to globals or prompt for input
-		for kewi_arg, input_value in zip(kewi_args, inputs):
-			frame.f_globals[kewi_arg.full_name] = parse_input_value(kewi_arg.name, kewi_arg.type, input_value)
-		
-		# For any arguments not provided, prompt for input if necessary
-		for kewi_arg in kewi_args[len(inputs):]:
-			if kewi_arg.full_name not in frame.f_globals:
-				frame.f_globals[kewi_arg.full_name] = request_input(kewi_arg.name, kewi_arg.type)
-	except KewiInputError as e:
-		if runner:
-			# Delegate error handling to the runner
-			runner.handle_input_error(e)
-		else:
-			print(e)
-		sys.exit(1)
+# sets the args in the given frame for the script
+def args_set_frame(inputs: List[Any], kewi_args: List[KewiArg], frame: FrameType, request_input: Callable):
+	# Assign values to globals or prompt for input
+	for kewi_arg, input_value in zip(kewi_args, inputs):
+		frame.f_globals[kewi_arg.full_name] = parse_input_value(kewi_arg.name, kewi_arg.type, input_value)
 
+	# For any arguments not provided, prompt for input if necessary
+	for kewi_arg in kewi_args[len(inputs):]:
+		if kewi_arg.full_name not in frame.f_globals:
+			frame.f_globals[kewi_arg.full_name] = request_input(kewi_arg)
+	
 
 def parse_command_line_args(kewi_args: List[KewiArg]):
 	"""Parse positional arguments from the command line."""
@@ -132,7 +123,7 @@ def parse_command_line_args(kewi_args: List[KewiArg]):
 	return args
 
 
-def request_input(arg_name: str, arg_type: Any) -> Any:
+def request_input_console(arg_name: str, arg_type: Any) -> Any:
 	"""Request input for missing arguments."""
 	try:
 		if inspect.isclass(arg_type) and issubclass(arg_type, Enum):
@@ -227,17 +218,29 @@ PAST_MIDNIGHT_HOURS = 5 # how many hours past midnight is still considered the s
 LOCAL_TZ = pytz.timezone(globals.TIMEZONE)
 class TimeSpan:
 	def __init__(self, start: datetime, end: datetime):
-		self.start = start
-		self.end = end
+		self.start = start.astimezone(LOCAL_TZ)
+		self.end = end.astimezone(LOCAL_TZ)
 
 	def __str__(self):
 		result = "start: " + self.start.strftime("%I:%M %p - %d-%b-%Y")
 		result += "\n  end: " + self.end.strftime("%I:%M %p - %d-%b-%Y")
 		return result
 
+	def contains(self, date: datetime):
+		return self.start < date and self.end > date
+	
+	def intersects(self, span: 'TimeSpan'):
+		return (
+			span.start < self.start and span.end > self.end
+			or self.start < span.start and self.end > span.start
+			or self.start < span.end and self.end > span.end
+	  )
+
 	@classmethod
 	def from_day(cls, text: str):
 		day: datetime
+		pattern1 = r" ?(?:—|â€”|\u2014)? ?([0-9]{2}/[0-9]{2}/[0-9]{4})"
+
 		if isinstance(text, datetime):
 			if text.tzinfo is not None and text.tzinfo.utcoffset(text) is not None:
 				day = text.astimezone(LOCAL_TZ)
@@ -245,6 +248,11 @@ class TimeSpan:
 				day = LOCAL_TZ.localize(text)
 			day -= timedelta(hours=PAST_MIDNIGHT_HOURS)
 			day = day.replace(hour=0, minute=0, second=0)
+		elif re.match(pattern1, text):
+			match = re.match(pattern1, text)
+			text = match.group(1)
+			day = datetime.strptime(text, "%m/%d/%Y")
+			day = LOCAL_TZ.localize(day)
 		else:
 			day = datetime.strptime(text, "%Y-%m-%d")
 			day = LOCAL_TZ.localize(day)

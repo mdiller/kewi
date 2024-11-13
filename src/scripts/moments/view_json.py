@@ -5,9 +5,9 @@ import kewi
 
 # give this a path to a steelseries moments video file
 ARG_video_file: kewi.args.FilePath = kewi.globals.Moments.EXAMPLE_FILE
-kewi.args.init()
+kewi.ctx.init()
 
-kewi.out.print("Target File: " + ARG_video_file.fullpath)
+kewi.ctx.print("Target File: " + ARG_video_file.fullpath)
 
 json_filename = kewi.cache.new(ARG_video_file.fullpath, "json")
 # os.startfile(json_filename)
@@ -24,8 +24,8 @@ def read_video_json(video_path, just_get_lavf = False):
 		value = video.tags[key]
 		escaped_key = ''.join(f'\\x{ord(c):02x}' for c in key)
 		value_shortened = str(value)
-		if len(value_shortened) > 50:
-			value_shortened = value_shortened[:50 - 3] + "..."
+		# if len(value_shortened) > 50:
+		# 	value_shortened = value_shortened[:50 - 3] + "..."
 		print(escaped_key, type(value), value_shortened)
 
 	print("")
@@ -44,6 +44,13 @@ def read_video_json(video_path, just_get_lavf = False):
 		
 		jsontext += value
 		i += 1
+	
+	jsontext = jsontext.replace("\r", "")
+
+	# temp = kewi.cache.temp("json")
+	# with open(temp, "w+") as f:
+	# 	f.write(jsontext)
+	# os.startfile(temp)
 	return json.loads(jsontext)
 
 data = read_video_json(ARG_video_file.fullpath)
@@ -53,5 +60,5 @@ with open(json_filename, "w+") as f:
 	f.write(json.dumps(data, indent="\t"))
 
 
-kewi.out.print("Wrote json to: " + json_filename)
+kewi.ctx.print("Wrote json to: " + json_filename)
 os.startfile(json_filename)

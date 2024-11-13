@@ -12,7 +12,7 @@ import requests
 import kewi
 
 ARG_time_span: kewi.args.TimeSpan = "today"
-kewi.args.init()
+kewi.ctx.init()
 
 
 CREDENTIALS_PATH = "C:\\dev\\projects\\kewi\\src\\scripts\\google\\_credentials.json"

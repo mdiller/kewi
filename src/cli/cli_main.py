@@ -2,6 +2,7 @@
 # PYTHON_ARGCOMPLETE_OK
 import argcomplete
 import argparse
+from kewi.context import KewiContextConsole
 from kewi.core.runner import Runner
 import kewi
 
@@ -17,14 +18,15 @@ def scriptname_completer(prefix, parsed_args, **kwargs):
 def list_scripts(cmd_namespace):
 	scripts = runner.list_scripts()
 	for script in scripts:
-		kewi.out.print(f"{script.name}")
+		kewi.ctx.print(f"{script.name}")
 
 def run_script(scriptname, cli_args):
 	script = runner.get_script(scriptname)
 	if script:
-		runner.run_script(script, cli_args)  # Pass the CLI arguments to the runner
+		ctx = KewiContextConsole(cli_args)
+		runner.run_script(script, ctx)  # Pass the CLI arguments to the runner
 	else:
-		kewi.out.print(f"Couldn't find a script by that name")
+		kewi.ctx.print(f"Couldn't find a script by that name")
 
 def main():
 	# Create the argument parser

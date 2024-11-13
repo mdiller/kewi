@@ -3,10 +3,10 @@ import requests
 from dotabase import dotabase_session, Hero
 from datetime import datetime
 
-from kewi.out import TableAlign
+from kewi.context import TableAlign
 
 ARG_player_id: int = kewi.globals.Dota.STEAM_ID
-kewi.args.init()
+kewi.ctx.init()
 
 url = f"https://api.opendota.com/api/players/{ARG_player_id}/matches?limit=20&significant=0"
 
@@ -39,7 +39,7 @@ header = [
 	"Start Time"
 ]
 
-kewi.out.print("Matches:")
+kewi.ctx.print("Matches:")
 
 # TODO: have a like kewi.openscratch or soemthing that saves the json and opens it in a cache json file for viewing
 
@@ -63,4 +63,4 @@ for match in data:
 		date.strftime("%I:%M%p, %b %d %Y")
 	])
 
-kewi.out.print_table(table, align=TableAlign.LEFT)
+kewi.ctx.print_table(table, align=TableAlign.LEFT)
